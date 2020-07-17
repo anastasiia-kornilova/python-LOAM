@@ -1,0 +1,159 @@
+import mrob
+import numpy as np
+import open3d as o3d
+
+from feature_extractor import FeatureExtractor
+from optimizer import LOAMOptimizer
+
+
+class OdometryEstimator:
+    DISTANCE_SQ_THRESHOLD = 25
+    SCAN_VICINITY = 2.5
+
+    def __init__(self):
+        self.extractor = FeatureExtractor()
+
+        self.inited = False
+        self.last_less_sharp_points = None
+        self.last_less_flat_points = None
+        self.last_position = np.eye(4)
+
+    def append_pcd(self, pcd):
+        sharp_points, less_sharp_points, flat_points, less_flat_points = self.extractor.extract_features(pcd)
+        T = None
+        if not self.inited:
+            self.inited = True
+            T = np.zeros(6)
+        else:
+            edge_corresp = self.find_edge_correspondences(sharp_points)
+            surface_corresp = self.find_surface_correspondences(flat_points)
+            optimizer = LOAMOptimizer(edge_corresp, surface_corresp)
+            T = optimizer.optimize()
+
+        self.last_less_sharp_points = np.vstack(less_sharp_points)
+        self.last_less_flat_points = np.vstack(flat_points)
+        self.last_position = mrob.geometry.SE3(T).T() @ self.last_position
+        return mrob.geometry.SE3(T).T()
+
+    def find_edge_correspondences(self, sharp_points):
+        corners_cnt = len(sharp_points)
+
+        edge_points = []
+        edge_1 = []
+        edge_2 = []
+        less_sharp_points_tree = o3d.geometry.KDTreeFlann(self.get_pcd_from_numpy(self.last_less_sharp_points))
+        for i in range(corners_cnt):
+            point_sel = sharp_points[i]
+            _, idx, dist = less_sharp_points_tree.search_knn_vector_3d(point_sel[:3], 1)
+            min_point_ind_2 = -1
+            if dist[0] < self.DISTANCE_SQ_THRESHOLD:
+                closest_point_ind = idx[0]
+                min_point_sq_dist_2 = self.DISTANCE_SQ_THRESHOLD
+                closest_point_scan_id = self.last_less_sharp_points[closest_point_ind][3]
+
+                dist_to_sel_point = np.einsum('ij,ij->i', (self.last_less_sharp_points[:, :3] - point_sel[:3]),
+                                              (self.last_less_sharp_points[:, :3] - point_sel[:3]))
+
+                for j in range(closest_point_ind + 1, len(self.last_less_sharp_points)):
+                    if self.last_less_sharp_points[j][3] <= closest_point_scan_id:
+                        continue
+                    if self.last_less_sharp_points[j][3] > closest_point_scan_id + self.SCAN_VICINITY:
+                        break
+
+                    point_sq_dist = dist_to_sel_point[j]
+                    if point_sq_dist < min_point_sq_dist_2:
+                        min_point_sq_dist_2 = point_sq_dist
+                        min_point_ind_2 = j
+
+                for j in range(closest_point_ind - 1, -1, -1):
+                    if self.last_less_sharp_points[j][3] >= closest_point_scan_id:
+                        continue
+                    if self.last_less_sharp_points[j][3] < closest_point_scan_id - self.SCAN_VICINITY:
+                        break
+
+                    point_sq_dist = dist_to_sel_point[j]
+                    if point_sq_dist < min_point_sq_dist_2:
+                        min_point_sq_dist_2 = point_sq_dist
+                        min_point_ind_2 = j
+
+                if min_point_ind_2 >= 0:
+                    edge_points.append(point_sel)
+                    edge_1.append(self.last_less_sharp_points[closest_point_ind])
+                    edge_2.append(self.last_less_sharp_points[min_point_ind_2])
+
+        edge_points = np.vstack(edge_points)[:, :3]
+        edge_1 = np.vstack(edge_1)[:, :3]
+        edge_2 = np.vstack(edge_2)[:, :3]
+
+        return edge_points, edge_1, edge_2
+
+    def find_surface_correspondences(self, flat_points):
+        surface_cnt = len(flat_points)
+
+        surface_points = []
+        surface_1 = []
+        surface_2 = []
+        surface_3 = []
+
+        less_flat_points_tree = o3d.geometry.KDTreeFlann(self.get_pcd_from_numpy(self.last_less_flat_points))
+        for i in range(surface_cnt):
+            point_sel = flat_points[i]
+            _, idx, dist = less_flat_points_tree.search_knn_vector_3d(point_sel[:3], 1)
+            min_point_ind_2 = -1
+            min_point_ind_3 = -1
+
+            dist_to_sel_point = np.einsum('ij,ij->i', (self.last_less_flat_points[:, :3] - point_sel[:3]),
+                                          (self.last_less_flat_points[:, :3] - point_sel[:3]))
+
+            if dist[0] < self.DISTANCE_SQ_THRESHOLD:
+                closest_point_ind = idx[0]
+                closest_point_scan_id = self.last_less_flat_points[closest_point_ind][3]
+                min_point_sq_dist_2 = self.DISTANCE_SQ_THRESHOLD
+                min_point_sq_dist_3 = self.DISTANCE_SQ_THRESHOLD
+                for j in range(closest_point_ind + 1, len(self.last_less_flat_points)):
+                    if self.last_less_flat_points[j][3] > closest_point_scan_id + self.SCAN_VICINITY:
+                        break
+
+                    point_sq_dist = dist_to_sel_point[j]
+
+                    if self.last_less_flat_points[j][3] <= closest_point_scan_id \
+                            and point_sq_dist < min_point_sq_dist_2:
+                        min_point_sq_dist_2 = point_sq_dist
+                        min_point_ind_2 = j
+                    elif self.last_less_flat_points[j][3] > closest_point_scan_id \
+                            and point_sq_dist < min_point_sq_dist_3:
+                        min_point_sq_dist_3 = point_sq_dist
+                        min_point_ind_3 = j
+
+                for j in range(closest_point_ind - 1, -1, -1):
+                    if self.last_less_flat_points[j][3] < closest_point_scan_id - self.SCAN_VICINITY:
+                        break
+
+                    point_sq_dist = dist_to_sel_point[j]
+
+                    if self.last_less_flat_points[j][3] >= closest_point_scan_id \
+                            and point_sq_dist < min_point_sq_dist_2:
+                        min_point_sq_dist_2 = point_sq_dist
+                        min_point_ind_2 = j
+                    elif self.last_less_flat_points[j][3] < closest_point_scan_id \
+                            and point_sq_dist < min_point_sq_dist_3:
+                        min_point_sq_dist_3 = point_sq_dist
+                        min_point_ind_3 = j
+
+                if min_point_ind_2 >= 0 and min_point_ind_3 >= 0:
+                    surface_points.append(point_sel)
+                    surface_1.append(self.last_less_flat_points[closest_point_ind])
+                    surface_2.append(self.last_less_flat_points[min_point_ind_2])
+                    surface_3.append(self.last_less_flat_points[min_point_ind_3])
+
+        surface_points = np.vstack(surface_points)[:, :3]
+        surface_1 = np.vstack(surface_1)[:, :3]
+        surface_2 = np.vstack(surface_2)[:, :3]
+        surface_3 = np.vstack(surface_3)[:, :3]
+
+        return surface_points, surface_1, surface_2, surface_3
+
+    def get_pcd_from_numpy(self, pcd_np):
+        pcd = o3d.geometry.PointCloud()
+        pcd.points = o3d.utility.Vector3dVector(pcd_np[:, :3])
+        return pcd
