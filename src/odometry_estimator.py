@@ -33,7 +33,7 @@ class OdometryEstimator:
         self.last_less_sharp_points = np.vstack(less_sharp_points)
         self.last_less_flat_points = np.vstack(flat_points)
         self.last_position = mrob.geometry.SE3(T).T() @ self.last_position
-        return mrob.geometry.SE3(T).T()
+        return mrob.geometry.SE3(T).T(), less_sharp_points, less_flat_points
 
     def find_edge_correspondences(self, sharp_points):
         corners_cnt = len(sharp_points)

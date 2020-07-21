@@ -4,6 +4,7 @@ import open3d as o3d
 import os
 
 from odometry_estimator import OdometryEstimator
+from mapping import Mapper
 
 
 def find_transformation(source, target, trans_init):
@@ -24,23 +25,19 @@ def get_pcd_from_numpy(pcd_np):
 
 
 if __name__ == '__main__':
-    folder = '../alignment/numpy/'
+    folder = '../../alignment/numpy/'
     pcds_list = os.listdir(folder)
     pcds_list.sort()
 
     odometry = OdometryEstimator()
     global_transform = np.eye(4)
     pcds = []
-    for i in range(0, 50):
+    mapper = Mapper()
+    for i in range(0, 251):
         path = folder + pcds_list[i]
         pcd_np = np.load(path)[:, :3]
-
-        T = odometry.append_pcd(pcd_np)
-        global_transform = T @ global_transform
-        pcd = get_pcd_from_numpy(pcd_np)
-        pcds.append(pcd.transform(global_transform))
-
-    o3d.visualization.draw_geometries(pcds)
+        T, sharp_points, flat_points = odometry.append_pcd(pcd_np)
+        mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 50 == 0))
 
     pcds = []
     global_transform = np.eye(4)
