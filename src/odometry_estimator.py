@@ -4,6 +4,7 @@ import open3d as o3d
 
 from feature_extractor import FeatureExtractor
 from optimizer import LOAMOptimizer
+from utils import get_pcd_from_numpy
 
 
 class OdometryEstimator:
@@ -41,7 +42,7 @@ class OdometryEstimator:
         edge_points = []
         edge_1 = []
         edge_2 = []
-        less_sharp_points_tree = o3d.geometry.KDTreeFlann(self.get_pcd_from_numpy(self.last_less_sharp_points))
+        less_sharp_points_tree = o3d.geometry.KDTreeFlann(get_pcd_from_numpy(self.last_less_sharp_points))
         for i in range(corners_cnt):
             point_sel = sharp_points[i]
             _, idx, dist = less_sharp_points_tree.search_knn_vector_3d(point_sel[:3], 1)
@@ -95,7 +96,7 @@ class OdometryEstimator:
         surface_2 = []
         surface_3 = []
 
-        less_flat_points_tree = o3d.geometry.KDTreeFlann(self.get_pcd_from_numpy(self.last_less_flat_points))
+        less_flat_points_tree = o3d.geometry.KDTreeFlann(get_pcd_from_numpy(self.last_less_flat_points))
         for i in range(surface_cnt):
             point_sel = flat_points[i]
             _, idx, dist = less_flat_points_tree.search_knn_vector_3d(point_sel[:3], 1)
@@ -152,8 +153,3 @@ class OdometryEstimator:
         surface_3 = np.vstack(surface_3)[:, :3]
 
         return surface_points, surface_1, surface_2, surface_3
-
-    def get_pcd_from_numpy(self, pcd_np):
-        pcd = o3d.geometry.PointCloud()
-        pcd.points = o3d.utility.Vector3dVector(pcd_np[:, :3])
-        return pcd
