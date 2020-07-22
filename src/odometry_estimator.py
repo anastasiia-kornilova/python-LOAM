@@ -4,7 +4,7 @@ import open3d as o3d
 
 from feature_extractor import FeatureExtractor
 from optimizer import LOAMOptimizer
-from utils import get_pcd_from_numpy
+from utils import get_pcd_from_numpy, matrix_dot_product
 
 
 class OdometryEstimator:
@@ -56,8 +56,8 @@ class OdometryEstimator:
                 min_point_sq_dist_2 = self.DISTANCE_SQ_THRESHOLD
                 closest_point_scan_id = self.last_less_sharp_points[closest_point_ind][3]
 
-                dist_to_sel_point = np.einsum('ij,ij->i', (self.last_less_sharp_points[:, :3] - point_sel[:3]),
-                                              (self.last_less_sharp_points[:, :3] - point_sel[:3]))
+                dist_to_sel_point = matrix_dot_product((self.last_less_sharp_points[:, :3] - point_sel[:3]),
+                                                       (self.last_less_sharp_points[:, :3] - point_sel[:3]))
 
                 for j in range(closest_point_ind + 1, len(self.last_less_sharp_points)):
                     if self.last_less_sharp_points[j][3] <= closest_point_scan_id:
@@ -107,8 +107,8 @@ class OdometryEstimator:
             min_point_ind_2 = -1
             min_point_ind_3 = -1
 
-            dist_to_sel_point = np.einsum('ij,ij->i', (self.last_less_flat_points[:, :3] - point_sel[:3]),
-                                          (self.last_less_flat_points[:, :3] - point_sel[:3]))
+            dist_to_sel_point = matrix_dot_product((self.last_less_flat_points[:, :3] - point_sel[:3]),
+                                                   (self.last_less_flat_points[:, :3] - point_sel[:3]))
 
             if dist[0] < self.DISTANCE_SQ_THRESHOLD:
                 closest_point_ind = idx[0]

@@ -1,16 +1,23 @@
 import math
 import numpy as np
 
+from utils import matrix_dot_product
 
 class FeatureExtractor:
+    # Number of beamers in LiDAR
     N_SCANS = 16
+    # Number of segments to split every scan for feature detection
     N_SEGMENTS = 6
 
+    # Number of less sharp points to pick from point cloud
     PICKED_NUM_LESS_SHARP = 20
+    # Number of sharp points to pick from point cloud
     PICKED_NUM_SHARP = 2
+    # Number of less sharp points to pick from point cloud
     PICKED_NUM_FLAT = 4
-    FILTER_SIZE = 5
+    # Threshold to split sharp and flat points
     SURFACE_CURVATURE_THRESHOLD = 0.1
+    # Radius of points for curvature analysis (S / 2 from original paper, 5A section)
     FEATURES_REGION = 5
 
     def extract_features(self, pcd_numpy):
@@ -85,13 +92,13 @@ class FeatureExtractor:
 
     def get_curvatures(self, pcd):
         coef = [1, 1, 1, 1, 1, -10, 1, 1, 1, 1, 1]
-        assert len(coef) == 2 * self.FILTER_SIZE + 1
+        assert len(coef) == 2 * self.FEATURES_REGION + 1
         discr_diff = lambda x: np.convolve(x, coef, 'valid')
         x_diff = discr_diff(pcd[:, 0])
         y_diff = discr_diff(pcd[:, 1])
         z_diff = discr_diff(pcd[:, 2])
         curvatures = x_diff * x_diff + y_diff * y_diff + z_diff * z_diff
-        curvatures = np.pad(curvatures, self.FILTER_SIZE)
+        curvatures = np.pad(curvatures, self.FEATURES_REGION)
         return curvatures
 
     def reorder_pcd(self, pcd):
@@ -107,9 +114,9 @@ class FeatureExtractor:
 
         start = 0
         for ind, cnt in enumerate(elem_cnt):
-            scan_start[ind] = start + self.FILTER_SIZE
+            scan_start[ind] = start + self.FEATURES_REGION
             start += cnt
-            scan_end[ind] = start - self.FILTER_SIZE - 1
+            scan_end[ind] = start - self.FEATURES_REGION - 1
 
         laser_cloud = np.hstack((sorted_pcd, sorted_scan_ids.reshape((-1, 1))))
         return laser_cloud, scan_start, scan_end
@@ -120,7 +127,7 @@ class FeatureExtractor:
         diff_all = laser_cloud[ind - self.FEATURES_REGION + 1:ind + self.FEATURES_REGION + 2] \
                    - laser_cloud[ind - self.FEATURES_REGION:ind + self.FEATURES_REGION + 1]
 
-        sq_dist = np.einsum('ij,ij->i', diff_all[:, :3], diff_all[:, :3])
+        sq_dist = matrix_dot_product(diff_all[:, :3], diff_all[:, :3])
 
         for l in range(1, self.FEATURES_REGION + 1):
             if sq_dist[l + self.FEATURES_REGION] > 0.05:
@@ -175,8 +182,8 @@ class FeatureExtractor:
         return cloud_neighbors_picked
 
     def has_gap(self, laser_cloud, ind):
-        diff_S = laser_cloud[ind - self.FILTER_SIZE:ind + self.FILTER_SIZE + 1, :3] - laser_cloud[ind, :3]
-        sq_dist = np.einsum('ij,ij->i', diff_S[:, :3], diff_S[:, :3])
+        diff_S = laser_cloud[ind - self.FEATURES_REGION:ind + self.FEATURES_REGION + 1, :3] - laser_cloud[ind, :3]
+        sq_dist = matrix_dot_product(diff_S[:, :3], diff_S[:, :3])
         gapped = sq_dist[sq_dist > 0.3]
         if gapped.shape[0] > 0:
             return True

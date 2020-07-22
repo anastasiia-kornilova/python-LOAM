@@ -14,7 +14,7 @@ def find_transformation(source, target, trans_init):
     if not target.has_normals():
         target.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.5, max_nn=50))
     transformation = o3d.registration.registration_icp(source, target, threshold, trans_init,
-                                            o3d.registration.TransformationEstimationPointToPlane()).transformation
+                                                       o3d.registration.TransformationEstimationPointToPlane()).transformation
     return transformation
 
 
@@ -33,11 +33,11 @@ if __name__ == '__main__':
     global_transform = np.eye(4)
     pcds = []
     mapper = Mapper()
-    for i in range(0, 351):
+    for i in range(0, 301):
         path = folder + pcds_list[i]
         pcd_np = np.load(path)[:, :3]
         T, sharp_points, flat_points = odometry.append_pcd(pcd_np)
-        mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 350 == 0))
+        mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 300 == 0))
 
     pcds = []
     global_transform = np.eye(4)

@@ -2,6 +2,8 @@ import mrob
 import numpy as np
 from scipy.optimize import least_squares
 
+from utils import matrix_dot_product
+
 
 class LOAMOptimizer:
     def __init__(self, edge_factors, surface_factors):
@@ -25,7 +27,7 @@ class LOAMOptimizer:
         aligned_surface = T.transform_array(self.surface_factors[0])
         normal = np.cross(self.surface_factors[1] - self.surface_factors[2],
                           self.surface_factors[1] - self.surface_factors[3])
-        surface_resid = np.einsum('ij,ij->i', aligned_surface - self.surface_factors[1], normal)
+        surface_resid = matrix_dot_product(aligned_surface - self.surface_factors[1], normal)
 
         resid = np.concatenate((edge_resid, surface_resid))
         return resid
@@ -45,8 +47,8 @@ class LOAMOptimizer:
         edge_resid = np.divide(nu, de)
 
         aligned_surfaces = T.transform_array(self.surface_factors[0])
-        surface_resid = np.einsum('ij,ij->i', aligned_surfaces, self.surface_factors[1]) + \
-                        self.surface_factors[2].reshape((-1, ))
+        surface_resid = matrix_dot_product(aligned_surfaces, self.surface_factors[1]) + \
+                        self.surface_factors[2].reshape((-1,))
 
         resid = np.concatenate((edge_resid, surface_resid))
         return resid
