@@ -24,6 +24,9 @@ class FeatureExtractor:
 
         cloud_label = np.zeros((pcd_numpy.shape[0]))
         cloud_neighbors_picked = np.zeros((pcd_numpy.shape[0]))
+
+        cloud_neighbors_picked = self.remove_unreliable(cloud_neighbors_picked, pcd_numpy, scan_start, scan_end)
+
         for i in range(self.N_SCANS):
             if scan_end[i] - scan_start[i] < self.N_SEGMENTS:
                 continue
@@ -38,7 +41,8 @@ class FeatureExtractor:
                 for k in reversed(range(ep - sp)):
                     ind = sort_indices[k] + sp
 
-                    if cloud_neighbors_picked[ind] == 0 and cloud_curvatures[ind] > self.SURFACE_CURVATURE_THRESHOLD:
+                    if cloud_neighbors_picked[ind] == 0 and cloud_curvatures[ind] > self.SURFACE_CURVATURE_THRESHOLD\
+                            and not self.has_gap(laser_cloud, ind):
                         largest_picked_num += 1
                         if largest_picked_num <= self.PICKED_NUM_SHARP:
                             keypoints_sharp.append(laser_cloud[ind])
@@ -129,3 +133,52 @@ class FeatureExtractor:
             cloud_neighbors_picked[ind + l] = 1
 
         return cloud_neighbors_picked
+
+    def remove_unreliable(self, cloud_neighbors_picked, pcd, scan_start, scan_end):
+        for i in range(self.N_SCANS):
+            sp = scan_start[i]
+            ep = scan_end[i]
+
+            if ep - sp < self.N_SEGMENTS:
+                continue
+
+            for j in range(sp + 1, ep):
+                prev_point = pcd[j - 1]
+                point = pcd[j]
+                next_point = pcd[j + 1]
+
+                diff_next = np.dot(point - next_point, point - next_point)
+
+                if diff_next > 0.1:
+                    depth1 = np.linalg.norm(point)
+                    depth2 = np.linalg.norm(next_point)
+
+                    if depth1 > depth2:
+                        weighted_dist = np.sqrt(np.dot(point - next_point * depth2 / depth1,
+                                                       point - next_point * depth2 / depth1)) / depth2
+                        if weighted_dist < 0.1:
+                            cloud_neighbors_picked[j - self.FEATURES_REGION: j + self.FEATURES_REGION + 1] = 1
+                            continue
+                    else:
+                        weighted_dist = np.sqrt(np.dot(point - next_point * depth1 / depth2,
+                                                       point - next_point * depth1 / depth2)) / depth1
+
+                        if weighted_dist < 0.1:
+                            cloud_neighbors_picked[j - self.FEATURES_REGION: j + self.FEATURES_REGION + 1] = 1
+                            continue
+                    diff_prev = np.dot(point - prev_point, point - prev_point)
+                    dis = np.dot(point, point)
+
+                    if diff_next > 0.0002 * dis and diff_prev > 0.0002 * dis:
+                        cloud_neighbors_picked[j] = 1
+
+        return cloud_neighbors_picked
+
+    def has_gap(self, laser_cloud, ind):
+        diff_S = laser_cloud[ind - self.FILTER_SIZE:ind + self.FILTER_SIZE + 1, :3] - laser_cloud[ind, :3]
+        sq_dist = np.einsum('ij,ij->i', diff_S[:, :3], diff_S[:, :3])
+        gapped = sq_dist[sq_dist > 0.3]
+        if gapped.shape[0] > 0:
+            return True
+        else:
+            return False

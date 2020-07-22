@@ -33,11 +33,11 @@ if __name__ == '__main__':
     global_transform = np.eye(4)
     pcds = []
     mapper = Mapper()
-    for i in range(0, 251):
+    for i in range(0, 351):
         path = folder + pcds_list[i]
         pcd_np = np.load(path)[:, :3]
         T, sharp_points, flat_points = odometry.append_pcd(pcd_np)
-        mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 50 == 0))
+        mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 350 == 0))
 
     pcds = []
     global_transform = np.eye(4)
