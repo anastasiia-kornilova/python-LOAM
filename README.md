@@ -1,5 +1,7 @@
 # Py-LOAM: Python implementation of LOAM algorithm
 
+![CodeFactor](https://www.codefactor.io/repository/github/anastasiia-kornilova/python-LOAM/badge?style=plastic)
+
 The repo contains Python implementation of the paper "LOAM: Lidar Odometry And Mapping in Real-time" by Ji Zhang and 
 Sanjiv Singh.
 

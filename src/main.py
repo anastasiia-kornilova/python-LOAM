@@ -39,9 +39,10 @@ if __name__ == '__main__':
         T, sharp_points, flat_points = odometry.append_pcd(pcd_np)
         mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 300 == 0))
 
+    # Visual comparison with point-to-plane ICP
     pcds = []
     global_transform = np.eye(4)
-    for i in range(0, 50):
+    for i in range(0, 301):
         path_1 = folder + pcds_list[i]
         pcd_np_1 = get_pcd_from_numpy(np.load(path_1)[:, :3])
 
