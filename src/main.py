@@ -1,10 +1,10 @@
 import copy
 import numpy as np
 import open3d as o3d
-import os
 
-from odometry_estimator import OdometryEstimator
+from loader_vlp16 import LoaderVLP16
 from mapping import Mapper
+from odometry_estimator import OdometryEstimator
 
 
 def find_transformation(source, target, trans_init):
@@ -26,28 +26,24 @@ def get_pcd_from_numpy(pcd_np):
 
 if __name__ == '__main__':
     folder = '../../alignment/numpy/'
-    pcds_list = os.listdir(folder)
-    pcds_list.sort()
+
+    loader = LoaderVLP16(folder)
 
     odometry = OdometryEstimator()
     global_transform = np.eye(4)
     pcds = []
     mapper = Mapper()
-    for i in range(0, 301):
-        path = folder + pcds_list[i]
-        pcd_np = np.load(path)[:, :3]
-        T, sharp_points, flat_points = odometry.append_pcd(pcd_np)
-        mapper.append_undistorted(pcd_np, T, sharp_points, flat_points, vis=(i % 300 == 0))
+    for i in range(loader.length()):
+        pcd = loader.get_item(i)
+        T, sharp_points, flat_points = odometry.append_pcd(pcd)
+        mapper.append_undistorted(pcd, T, sharp_points, flat_points, vis=(i % 100 == 0))
 
     # Visual comparison with point-to-plane ICP
     pcds = []
     global_transform = np.eye(4)
-    for i in range(0, 301):
-        path_1 = folder + pcds_list[i]
-        pcd_np_1 = get_pcd_from_numpy(np.load(path_1)[:, :3])
-
-        path_2 = folder + pcds_list[i + 1]
-        pcd_np_2 = get_pcd_from_numpy(np.load(path_2)[:, :3])
+    for i in range(loader.length() - 1):
+        pcd_np_1 = get_pcd_from_numpy(loader.get_item(i))
+        pcd_np_2 = get_pcd_from_numpy(loader.get_item(i + 1))
 
         T = find_transformation(pcd_np_2, pcd_np_1, np.eye(4))
         global_transform = T @ global_transform
