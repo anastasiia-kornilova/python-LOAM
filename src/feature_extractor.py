@@ -3,9 +3,8 @@ import numpy as np
 
 from utils import matrix_dot_product
 
+
 class FeatureExtractor:
-    # Number of beamers in LiDAR
-    N_SCANS = 16
     # Number of segments to split every scan for feature detection
     N_SEGMENTS = 6
 
@@ -98,20 +97,20 @@ class FeatureExtractor:
     def mark_as_picked(self, laser_cloud, cloud_neighbors_picked, ind):
         cloud_neighbors_picked[ind] = 1
 
-        diff_all = laser_cloud[ind - self.FEATURES_REGION + 1:ind + self.FEATURES_REGION + 2] \
-                   - laser_cloud[ind - self.FEATURES_REGION:ind + self.FEATURES_REGION + 1]
+        diff_all = laser_cloud[ind - self.FEATURES_REGION + 1:ind + self.FEATURES_REGION + 2] - \
+                   laser_cloud[ind - self.FEATURES_REGION:ind + self.FEATURES_REGION + 1]
 
         sq_dist = matrix_dot_product(diff_all[:, :3], diff_all[:, :3])
 
-        for l in range(1, self.FEATURES_REGION + 1):
-            if sq_dist[l + self.FEATURES_REGION] > 0.05:
+        for i in range(1, self.FEATURES_REGION + 1):
+            if sq_dist[i + self.FEATURES_REGION] > 0.05:
                 break
-            cloud_neighbors_picked[ind + l] = 1
+            cloud_neighbors_picked[ind + i] = 1
 
-        for l in range(-self.FEATURES_REGION, 0):
-            if sq_dist[l + self.FEATURES_REGION] > 0.05:
+        for i in range(-self.FEATURES_REGION, 0):
+            if sq_dist[i + self.FEATURES_REGION] > 0.05:
                 break
-            cloud_neighbors_picked[ind + l] = 1
+            cloud_neighbors_picked[ind + i] = 1
 
         return cloud_neighbors_picked
 
@@ -124,9 +123,9 @@ class FeatureExtractor:
                 continue
 
             for j in range(sp + 1, ep):
-                prev_point = pcd[j - 1]
-                point = pcd[j]
-                next_point = pcd[j + 1]
+                prev_point = pcd[j - 1][:3]
+                point = pcd[j][:3]
+                next_point = pcd[j + 1][:3]
 
                 diff_next = np.dot(point - next_point, point - next_point)
 
