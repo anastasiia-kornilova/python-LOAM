@@ -34,10 +34,10 @@ class OdometryEstimator:
 
         self.last_less_sharp_points = np.vstack(less_sharp_points)
         x = get_pcd_from_numpy(np.vstack(less_flat_points))
-        y = np.vstack(less_flat_points)[:, 3].reshape((-1, 1))
-        x.normals = o3d.utility.Vector3dVector(np.hstack((y, y, y)))
+        y = np.vstack(less_flat_points)[:, 3].reshape((-1, 1)) / 64
+        x.colors = o3d.utility.Vector3dVector(np.hstack((y, y, y)))
         x = x.voxel_down_sample(0.2)
-        self.last_less_flat_points = np.hstack((np.asarray(x.points), np.asarray(x.normals)[:, 0].reshape((-1, 1))))
+        self.last_less_flat_points = np.hstack((np.asarray(x.points), 64 * np.asarray(x.colors)[:, 0].reshape((-1, 1))))
         self.last_position = mrob.geometry.SE3(T).T() @ self.last_position
         return mrob.geometry.SE3(T).T(), less_sharp_points, self.last_less_flat_points
 
