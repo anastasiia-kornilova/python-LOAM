@@ -20,7 +20,8 @@ class OdometryEstimator:
         self.last_position = np.eye(4)
 
     def append_pcd(self, pcd):
-        sharp_points, less_sharp_points, flat_points, less_flat_points = self.extractor.extract_features(pcd)
+        sharp_points, less_sharp_points, flat_points, less_flat_points = self.extractor.extract_features(pcd[0], pcd[1],
+                                                                                                         pcd[2])
         T = None
         if not self.inited:
             self.inited = True

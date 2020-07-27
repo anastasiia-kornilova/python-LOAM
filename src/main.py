@@ -2,7 +2,8 @@ import copy
 import numpy as np
 import open3d as o3d
 
-from loader_vlp16 import LoaderVLP16
+# from loader_vlp16 import LoaderVLP16
+from loader_kitti import LoaderKITTI
 from mapping import Mapper
 from odometry_estimator import OdometryEstimator
 
@@ -25,9 +26,10 @@ def get_pcd_from_numpy(pcd_np):
 
 
 if __name__ == '__main__':
-    folder = '../../alignment/numpy/'
+    # folder = '../../alignment/numpy/'
+    folder = '/home/anastasiya/data/data_odometry_velodyne.zip/'
 
-    loader = LoaderVLP16(folder)
+    loader = LoaderKITTI(folder, '00')
 
     odometry = OdometryEstimator()
     global_transform = np.eye(4)
@@ -36,7 +38,7 @@ if __name__ == '__main__':
     for i in range(loader.length()):
         pcd = loader.get_item(i)
         T, sharp_points, flat_points = odometry.append_pcd(pcd)
-        mapper.append_undistorted(pcd, T, sharp_points, flat_points, vis=(i % 100 == 0))
+        mapper.append_undistorted(pcd[0], T, sharp_points, flat_points, vis=(i % 2 == 0))
 
     # Visual comparison with point-to-plane ICP
     pcds = []

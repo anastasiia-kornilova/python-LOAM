@@ -20,27 +20,28 @@ class FeatureExtractor:
     # Radius of points for curvature analysis (S / 2 from original paper, 5A section)
     FEATURES_REGION = 5
 
-    def extract_features(self, pcd_numpy):
+    def extract_features(self, laser_cloud, scan_start, scan_end):
         keypoints_sharp = []
         keypoints_less_sharp = []
         keypoints_flat = []
         keypoints_less_flat = []
 
-        laser_cloud, scan_start, scan_end = self.reorder_pcd(pcd_numpy)
         cloud_curvatures = self.get_curvatures(laser_cloud)
 
-        cloud_label = np.zeros((pcd_numpy.shape[0]))
-        cloud_neighbors_picked = np.zeros((pcd_numpy.shape[0]))
+        cloud_label = np.zeros((laser_cloud.shape[0]))
+        cloud_neighbors_picked = np.zeros((laser_cloud.shape[0]))
 
-        cloud_neighbors_picked = self.remove_unreliable(cloud_neighbors_picked, pcd_numpy, scan_start, scan_end)
+        cloud_neighbors_picked = self.remove_unreliable(cloud_neighbors_picked, laser_cloud, scan_start, scan_end)
 
-        for i in range(self.N_SCANS):
-            if scan_end[i] - scan_start[i] < self.N_SEGMENTS:
+        for i in range(scan_end.shape[0]):
+            s = scan_start[i] + self.FEATURES_REGION
+            e = scan_end[i] - self.FEATURES_REGION - 1
+            if e - s < self.N_SEGMENTS:
                 continue
 
             for j in range(self.N_SEGMENTS):
-                sp = scan_start[i] + (scan_end[i] - scan_start[i]) * j // self.N_SEGMENTS
-                ep = scan_start[i] + (scan_end[i] - scan_start[i]) * (j + 1) // self.N_SEGMENTS - 1
+                sp = s + (e - s) * j // self.N_SEGMENTS
+                ep = s + (e - s) * (j + 1) // self.N_SEGMENTS - 1
                 segments_curvatures = cloud_curvatures[sp:ep + 1]
                 sort_indices = np.argsort(segments_curvatures)
 
@@ -83,13 +84,6 @@ class FeatureExtractor:
 
         return keypoints_sharp, keypoints_less_sharp, keypoints_flat, keypoints_less_flat
 
-    def get_scan_ids(self, pcd):
-        angles_rad = np.arctan(np.divide(pcd[:, 2], np.sqrt(pcd[:, 0] * pcd[:, 0] + pcd[:, 1] * pcd[:, 1])))
-        angles_deg = angles_rad * 180 / math.pi
-        scan_ids = ((angles_deg + self.N_SCANS - 1) / 2 + 0.5).astype(int)
-
-        return scan_ids
-
     def get_curvatures(self, pcd):
         coef = [1, 1, 1, 1, 1, -10, 1, 1, 1, 1, 1]
         assert len(coef) == 2 * self.FEATURES_REGION + 1
@@ -100,26 +94,6 @@ class FeatureExtractor:
         curvatures = x_diff * x_diff + y_diff * y_diff + z_diff * z_diff
         curvatures = np.pad(curvatures, self.FEATURES_REGION)
         return curvatures
-
-    def reorder_pcd(self, pcd):
-        scan_start = np.zeros(self.N_SCANS, dtype=int)
-        scan_end = np.zeros(self.N_SCANS, dtype=int)
-
-        scan_ids = self.get_scan_ids(pcd)
-        sorted_ind = np.argsort(scan_ids, kind='stable')
-        sorted_pcd = pcd[sorted_ind]
-        sorted_scan_ids = scan_ids[sorted_ind]
-
-        elements, elem_cnt = np.unique(sorted_scan_ids, return_counts=True)
-
-        start = 0
-        for ind, cnt in enumerate(elem_cnt):
-            scan_start[ind] = start + self.FEATURES_REGION
-            start += cnt
-            scan_end[ind] = start - self.FEATURES_REGION - 1
-
-        laser_cloud = np.hstack((sorted_pcd, sorted_scan_ids.reshape((-1, 1))))
-        return laser_cloud, scan_start, scan_end
 
     def mark_as_picked(self, laser_cloud, cloud_neighbors_picked, ind):
         cloud_neighbors_picked[ind] = 1
@@ -142,9 +116,9 @@ class FeatureExtractor:
         return cloud_neighbors_picked
 
     def remove_unreliable(self, cloud_neighbors_picked, pcd, scan_start, scan_end):
-        for i in range(self.N_SCANS):
-            sp = scan_start[i]
-            ep = scan_end[i]
+        for i in range(scan_end.shape[0]):
+            sp = scan_start[i] + self.FEATURES_REGION
+            ep = scan_end[i] - self.FEATURES_REGION
 
             if ep - sp < self.N_SEGMENTS:
                 continue
