@@ -28,7 +28,6 @@ def get_pcd_from_numpy(pcd_np):
 if __name__ == '__main__':
     # folder = '../../alignment/numpy/'
     folder = '/home/anastasiya/data/data_odometry_velodyne.zip/'
-
     loader = LoaderKITTI(folder, '00')
 
     odometry = OdometryEstimator()
@@ -36,19 +35,24 @@ if __name__ == '__main__':
     pcds = []
     mapper = Mapper()
     for i in range(loader.length()):
-        pcd = loader.get_item(i)
-        T, sharp_points, flat_points = odometry.append_pcd(pcd)
-        mapper.append_undistorted(pcd[0], T, sharp_points, flat_points, vis=(i % 2 == 0))
+        if i >= 50:
+            pcd = loader.get_item(i)
+            T, sharp_points, flat_points = odometry.append_pcd(pcd)
+            mapper.append_undistorted(pcd[0], T, sharp_points, flat_points, vis=(i % 1 == 0))
 
     # Visual comparison with point-to-plane ICP
     pcds = []
     global_transform = np.eye(4)
-    for i in range(loader.length() - 1):
-        pcd_np_1 = get_pcd_from_numpy(loader.get_item(i))
-        pcd_np_2 = get_pcd_from_numpy(loader.get_item(i + 1))
+    for i in range(50, 56):
+        print(i)
+        pcd_np_1 = get_pcd_from_numpy(loader.get_item(i)[0])
+        pcd_np_2 = get_pcd_from_numpy(loader.get_item(i + 1)[0])
 
         T = find_transformation(pcd_np_2, pcd_np_1, np.eye(4))
+        print(T)
+        print(T)
         global_transform = T @ global_transform
         pcds.append(copy.deepcopy(pcd_np_2).transform(global_transform))
+        pcds.append(copy.deepcopy(pcd_np_1))
 
     o3d.visualization.draw_geometries(pcds)

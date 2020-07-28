@@ -19,6 +19,7 @@ class Mapper:
         self.aligned_pcds = []
         self.all_edges = None
         self.all_surfaces = None
+        self.cnt = 0
 
     def undistort(self, pcd, T):
         N_GROUPS = 30
@@ -32,6 +33,7 @@ class Mapper:
         return reformed
 
     def append_undistorted(self, pcd, T, edge_points, surface_points, vis=False):
+        self.cnt += 1
         if not self.init:
             self.init = True
             pcd = get_pcd_from_numpy(pcd)
@@ -43,7 +45,7 @@ class Mapper:
             prior_position = T @ self.position
             edge_points = np.asarray(self.filter_pcd(get_pcd_from_numpy(np.vstack(edge_points)), 'edge').points)
             surface_points = np.asarray(self.filter_pcd(get_pcd_from_numpy(np.vstack(surface_points)), 'surface').points)
-            restored_pcd = self.undistort(np.vstack(pcd), T)
+            restored_pcd = np.vstack(pcd)
             transformed_pcd = mrob.geometry.SE3(prior_position).transform_array(restored_pcd)
             transformed_edge_points = mrob.geometry.SE3(prior_position).transform_array(np.vstack(edge_points))
             edges_kdtree = o3d.geometry.KDTreeFlann(self.all_edges)
@@ -81,18 +83,18 @@ class Mapper:
                 optimizer = LOAMOptimizer((np.vstack(edges), np.vstack(edge_A), np.vstack(edge_B)),
                                           (np.vstack(surfaces), np.vstack(surface_A), np.vstack(surface_B)))
                 T = optimizer.optimize_2()
-                self.aligned_pcds.append(get_pcd_from_numpy(T.transform_array(transformed_pcd)))
-                self.all_edges += get_pcd_from_numpy(T.transform_array(transformed_edge_points))
-                self.all_surfaces += get_pcd_from_numpy(T.transform_array(transformed_surface_points))
                 self.position = T.T() @ prior_position
+                self.aligned_pcds.append(get_pcd_from_numpy(T.transform_array(transformed_pcd)))
+                if self.cnt % 3 == 0:
+                    self.all_edges += get_pcd_from_numpy(T.transform_array(transformed_edge_points))
+                    self.all_surfaces += get_pcd_from_numpy(T.transform_array(transformed_surface_points))
+                    self.all_edges = self.filter_pcd(self.all_edges, 'edge')
+                    self.all_surfaces = self.filter_pcd(self.all_surfaces, 'surface')
             else:
                 self.aligned_pcds.append(get_pcd_from_numpy(transformed_pcd))
                 self.all_edges += get_pcd_from_numpy(transformed_edge_points)
                 self.all_surfaces += get_pcd_from_numpy(transformed_surface_points)
 
-            if len(self.aligned_pcds) % 20 == 0:
-                self.all_edges = self.filter_pcd(self.all_edges, 'edge')
-                self.all_surfaces = self.filter_pcd(self.all_surfaces, 'surface')
 
             if vis:
                 o3d.visualization.draw_geometries(self.aligned_pcds)

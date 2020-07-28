@@ -11,7 +11,7 @@ class FeatureExtractor:
     # Number of less sharp points to pick from point cloud
     PICKED_NUM_LESS_SHARP = 20
     # Number of sharp points to pick from point cloud
-    PICKED_NUM_SHARP = 2
+    PICKED_NUM_SHARP = 4
     # Number of less sharp points to pick from point cloud
     PICKED_NUM_FLAT = 4
     # Threshold to split sharp and flat points
@@ -46,10 +46,12 @@ class FeatureExtractor:
 
                 largest_picked_num = 0
                 for k in reversed(range(ep - sp)):
+                    if i < 45:
+                        break
                     ind = sort_indices[k] + sp
 
-                    if cloud_neighbors_picked[ind] == 0 and cloud_curvatures[ind] > self.SURFACE_CURVATURE_THRESHOLD\
-                            and not self.has_gap(laser_cloud, ind):
+                    if cloud_neighbors_picked[ind] == 0 and cloud_curvatures[ind] > 0.5 and \
+                            self.can_be_edge(laser_cloud, ind):
                         largest_picked_num += 1
                         if largest_picked_num <= self.PICKED_NUM_SHARP:
                             keypoints_sharp.append(laser_cloud[ind])
@@ -65,6 +67,8 @@ class FeatureExtractor:
 
                 smallest_picked_num = 0
                 for k in range(ep - sp):
+                    if i < 50:
+                        break
                     ind = sort_indices[k] + sp
 
                     if cloud_neighbors_picked[ind] == 0 and cloud_curvatures[ind] < self.SURFACE_CURVATURE_THRESHOLD:
@@ -78,8 +82,18 @@ class FeatureExtractor:
                         cloud_neighbors_picked = self.mark_as_picked(laser_cloud, cloud_neighbors_picked, ind)
 
                 for k in range(sp, ep + 1):
-                    if cloud_label[k] <= 0:
+                    if cloud_label[k] <= 0 and cloud_curvatures[k] < self.SURFACE_CURVATURE_THRESHOLD \
+                            and not self.has_gap(laser_cloud, k):
                         keypoints_less_flat.append(laser_cloud[k])
+        import utils
+        import open3d as o3d
+        # keypoints = utils.get_pcd_from_numpy(np.vstack(keypoints_less_flat))
+        # keypoints.paint_uniform_color([0, 1, 0])
+        keypoints_2 = utils.get_pcd_from_numpy(np.vstack(keypoints_flat))
+        keypoints_2.paint_uniform_color([1, 0, 0])
+        pcd = utils.get_pcd_from_numpy(laser_cloud)
+        pcd.paint_uniform_color([0, 0, 1])
+        # o3d.visualization.draw_geometries([pcd, keypoints_2])
 
         return keypoints_sharp, keypoints_less_sharp, keypoints_flat, keypoints_less_flat
 
@@ -91,6 +105,7 @@ class FeatureExtractor:
         y_diff = discr_diff(pcd[:, 1])
         z_diff = discr_diff(pcd[:, 2])
         curvatures = x_diff * x_diff + y_diff * y_diff + z_diff * z_diff
+        curvatures /= np.linalg.norm(pcd[self.FEATURES_REGION:-self.FEATURES_REGION], axis=1) * 10
         curvatures = np.pad(curvatures, self.FEATURES_REGION)
         return curvatures
 
@@ -137,7 +152,7 @@ class FeatureExtractor:
                         weighted_dist = np.sqrt(np.dot(point - next_point * depth2 / depth1,
                                                        point - next_point * depth2 / depth1)) / depth2
                         if weighted_dist < 0.1:
-                            cloud_neighbors_picked[j - self.FEATURES_REGION: j + self.FEATURES_REGION + 1] = 1
+                            cloud_neighbors_picked[j - self.FEATURES_REGION:j + 1] = 1
                             continue
                     else:
                         weighted_dist = np.sqrt(np.dot(point - next_point * depth1 / depth2,
@@ -162,3 +177,13 @@ class FeatureExtractor:
             return True
         else:
             return False
+
+    def can_be_edge(self, laser_cloud, ind):
+        diff_S = laser_cloud[ind - self.FEATURES_REGION:ind + self.FEATURES_REGION, :3] -\
+                 laser_cloud[ind - self.FEATURES_REGION + 1:ind + self.FEATURES_REGION + 1, :3]
+        sq_dist = matrix_dot_product(diff_S[:, :3], diff_S[:, :3])
+        gapped = laser_cloud[ind - self.FEATURES_REGION:ind + self.FEATURES_REGION, :3][sq_dist > 0.2]
+        if len(gapped) == 0:
+            return True
+        else:
+            return np.any(np.linalg.norm(gapped, axis=1) > np.linalg.norm(laser_cloud[ind][:3]))
