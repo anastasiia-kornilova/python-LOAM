@@ -19,14 +19,14 @@ def get_pcd_from_numpy(np_pcd, color=[0, 0, 1]):
 
 
 if __name__ == '__main__':
-    edge_corresp_file = '../../src/preprocessed_corresp/edges/000000.csv'
+    edge_corresp_file = '../../LOAM/preprocessed_corresp/edges/000000.csv'
     edge_corresp_set = []
     with open(edge_corresp_file, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         for row in reader:
             edge_corresp_set.append((point_from_str(row[0]), point_from_str(row[1]), point_from_str(row[2])))
 
-    plane_corresp_file = '../../src/preprocessed_corresp/planes/000000.csv'
+    plane_corresp_file = '../../LOAM/preprocessed_corresp/planes/000000.csv'
     plane_corresp_set = []
     with open(plane_corresp_file, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
@@ -35,7 +35,7 @@ if __name__ == '__main__':
                                 , point_from_str(row[3])))
 
     # I know that is the most strange thing, TO FIX
-    sys.path.append("../../src")
+    sys.path.append("../../LOAM/")
     from loader_kitti import LoaderKITTI
     from LOAMSolver import LOAMSolver
     solver = LOAMSolver(use_estimators=True, region_rate=0.4)
