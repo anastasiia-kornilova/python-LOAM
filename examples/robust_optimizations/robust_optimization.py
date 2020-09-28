@@ -19,14 +19,14 @@ def get_pcd_from_numpy(np_pcd, color=[0, 0, 1]):
 
 
 if __name__ == '__main__':
-    edge_corresp_file = '../../LOAM/preprocessed_corresp/edges/000000.csv'
+    edge_corresp_file = 'data/corresp/edge_000000.csv'
     edge_corresp_set = []
     with open(edge_corresp_file, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         for row in reader:
             edge_corresp_set.append((point_from_str(row[0]), point_from_str(row[1]), point_from_str(row[2])))
 
-    plane_corresp_file = '../../LOAM/preprocessed_corresp/planes/000000.csv'
+    plane_corresp_file = 'data/corresp/plane_000000.csv'
     plane_corresp_set = []
     with open(plane_corresp_file, newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     solver = LOAMSolver(use_estimators=True, region_rate=0.4)
     T, inlier_errors, edge_inliers, plane_inliers = solver.fit(edge_corresp_set, plane_corresp_set)
 
-    loader = LoaderKITTI('/home/anastasiya/data/data_odometry_velodyne/', '00')
+    loader = LoaderKITTI('data/', '00')
     pcd1 = loader.get_item(0)
     pcd2 = loader.get_item(1)
 
